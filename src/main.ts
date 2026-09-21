@@ -1,10 +1,50 @@
 import Phaser from "phaser";
 
+const WIDTH = 800;
+const HEIGHT = 600;
+const BEST_KEY = "last-second-best";
+
+class MenuScene extends Phaser.Scene {
+  constructor() { super("MenuScene"); }
+
+  create() {
+    this.cameras.main.setBackgroundColor("#111827");
+    this.add.text(WIDTH / 2, 150, "LAST SECOND", {
+      fontFamily: "Arial", fontSize: "64px", fontStyle: "bold", color: "#ffffff"
+    }).setOrigin(0.5);
+
+    this.add.text(WIDTH / 2, 225, "How long can you survive?", {
+      fontFamily: "Arial", fontSize: "24px", color: "#9ca3af"
+    }).setOrigin(0.5);
+
+    const best = Number(localStorage.getItem(BEST_KEY) ?? 0);
+    this.add.text(WIDTH / 2, 285, `BEST: ${best}s`, {
+      fontFamily: "Arial", fontSize: "22px", color: "#60a5fa"
+    }).setOrigin(0.5);
+
+    const play = this.add.text(WIDTH / 2, 390, "PLAY", {
+      fontFamily: "Arial", fontSize: "34px", fontStyle: "bold",
+      color: "#ffffff", backgroundColor: "#2563eb",
+      padding: { left: 42, right: 42, top: 18, bottom: 18 }
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+    play.on("pointerover", () => play.setScale(1.05));
+    play.on("pointerout", () => play.setScale(1));
+    play.on("pointerdown", () => this.scene.start("GameScene"));
+
+    this.add.text(WIDTH / 2, 500, "WASD / Arrow Keys to move", {
+      fontFamily: "Arial", fontSize: "18px", color: "#6b7280"
+    }).setOrigin(0.5);
+  }
+}
+
 class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Arc;
-  private obstacle!: Phaser.GameObjects.Arc;
+  private obstacles: Phaser.GameObjects.Arc[] = [];
   private scoreText!: Phaser.GameObjects.Text;
-
+  private survivalTime = 0;
+  private gameOver = false;
+  private spawnTimer = 0;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keys!: {
     W: Phaser.Input.Keyboard.Key;
@@ -12,75 +52,195 @@ class GameScene extends Phaser.Scene {
     S: Phaser.Input.Keyboard.Key;
     D: Phaser.Input.Keyboard.Key;
   };
+  private touchDirection = { x: 0, y: 0 };
 
-  private survivalTime = 0;
-
-  constructor() {
-    super("GameScene");
-  }
+  constructor() { super("GameScene"); }
 
   create() {
     this.cameras.main.setBackgroundColor("#111827");
 
-    this.player = this.add.circle(400, 300, 18, 0x3b82f6);
-    this.obstacle = this.add.circle(100, 100, 16, 0xef4444);
+    this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH - 8, HEIGHT - 8)
+      .setStrokeStyle(2, 0x374151);
 
+    this.player = this.add.circle(WIDTH / 2, HEIGHT / 2, 18, 0x3b82f6);
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.keys = this.input.keyboard!.addKeys("W,A,S,D") as typeof this.keys;
 
-    this.scoreText = this.add
-      .text(20, 20, "TIME: 0", {
-        fontFamily: "Arial",
-        fontSize: "24px",
-        color: "#ffffff",
-      })
-      .setDepth(10);
+    this.scoreText = this.add.text(20, 18, "TIME: 0", {
+      fontFamily: "Arial", fontSize: "24px", fontStyle: "bold", color: "#ffffff"
+    }).setDepth(10);
+
+    this.add.text(WIDTH - 20, 18, `BEST: ${this.getBestScore()}s`, {
+      fontFamily: "Arial", fontSize: "20px", color: "#9ca3af"
+    }).setOrigin(1, 0).setDepth(10);
+
+    this.spawnObstacle();
+    this.createTouchControls();
   }
 
   update(_time: number, delta: number) {
-    const playerSpeed = 4;
-    const obstacleSpeed = 1.2;
+    if (this.gameOver) return;
 
-    this.survivalTime += delta / 1000;
+    const dt = delta / 1000;
+    this.survivalTime += dt;
     this.scoreText.setText(`TIME: ${Math.floor(this.survivalTime)}`);
 
-    if (this.cursors.left.isDown || this.keys.A.isDown) this.player.x -= playerSpeed;
-    if (this.cursors.right.isDown || this.keys.D.isDown) this.player.x += playerSpeed;
-    if (this.cursors.up.isDown || this.keys.W.isDown) this.player.y -= playerSpeed;
-    if (this.cursors.down.isDown || this.keys.S.isDown) this.player.y += playerSpeed;
+    const playerSpeed = 280;
+    let dx = 0;
+    let dy = 0;
 
-    this.player.x = Phaser.Math.Clamp(this.player.x, 18, 782);
-    this.player.y = Phaser.Math.Clamp(this.player.y, 18, 582);
+    if (this.cursors.left.isDown || this.keys.A.isDown) dx -= 1;
+    if (this.cursors.right.isDown || this.keys.D.isDown) dx += 1;
+    if (this.cursors.up.isDown || this.keys.W.isDown) dy -= 1;
+    if (this.cursors.down.isDown || this.keys.S.isDown) dy += 1;
 
-    const angle = Phaser.Math.Angle.Between(
-      this.obstacle.x,
-      this.obstacle.y,
-      this.player.x,
-      this.player.y
-    );
+    dx += this.touchDirection.x;
+    dy += this.touchDirection.y;
 
-    this.obstacle.x += Math.cos(angle) * obstacleSpeed;
-    this.obstacle.y += Math.sin(angle) * obstacleSpeed;
+    if (dx !== 0 || dy !== 0) {
+      const length = Math.sqrt(dx * dx + dy * dy);
+      this.player.x += (dx / length) * playerSpeed * dt;
+      this.player.y += (dy / length) * playerSpeed * dt;
+    }
 
-    const distance = Phaser.Math.Distance.Between(
-      this.player.x,
-      this.player.y,
-      this.obstacle.x,
-      this.obstacle.y
-    );
+    this.player.x = Phaser.Math.Clamp(this.player.x, 18, WIDTH - 18);
+    this.player.y = Phaser.Math.Clamp(this.player.y, 18, HEIGHT - 18);
 
-    if (distance < 34) {
-      this.scene.restart();
+    this.spawnTimer += delta;
+    const spawnInterval = Math.max(1200, 4200 - this.survivalTime * 90);
+
+    if (this.spawnTimer >= spawnInterval) {
+      this.spawnTimer = 0;
+      this.spawnObstacle();
+    }
+
+    const obstacleSpeed = 72 + this.survivalTime * 3.5;
+
+    for (const obstacle of this.obstacles) {
+      const angle = Phaser.Math.Angle.Between(
+        obstacle.x, obstacle.y, this.player.x, this.player.y
+      );
+
+      obstacle.x += Math.cos(angle) * obstacleSpeed * dt;
+      obstacle.y += Math.sin(angle) * obstacleSpeed * dt;
+
+      const distance = Phaser.Math.Distance.Between(
+        this.player.x, this.player.y, obstacle.x, obstacle.y
+      );
+
+      if (distance < 34) {
+        this.endGame();
+        return;
+      }
+    }
+  }
+
+  private spawnObstacle() {
+    const side = Phaser.Math.Between(0, 3);
+    let x = 0;
+    let y = 0;
+
+    if (side === 0) {
+      x = Phaser.Math.Between(20, WIDTH - 20); y = -20;
+    } else if (side === 1) {
+      x = WIDTH + 20; y = Phaser.Math.Between(20, HEIGHT - 20);
+    } else if (side === 2) {
+      x = Phaser.Math.Between(20, WIDTH - 20); y = HEIGHT + 20;
+    } else {
+      x = -20; y = Phaser.Math.Between(20, HEIGHT - 20);
+    }
+
+    this.obstacles.push(this.add.circle(x, y, 16, 0xef4444));
+  }
+
+  private getBestScore() {
+    return Number(localStorage.getItem(BEST_KEY) ?? 0);
+  }
+
+  private endGame() {
+    this.gameOver = true;
+
+    const score = Math.floor(this.survivalTime);
+    const oldBest = this.getBestScore();
+    const newBest = Math.max(score, oldBest);
+
+    if (newBest !== oldBest) localStorage.setItem(BEST_KEY, String(newBest));
+
+    this.cameras.main.flash(180, 255, 255, 255);
+
+    this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT, 0x000000, 0.72).setDepth(20);
+
+    this.add.text(WIDTH / 2, 190, "GAME OVER", {
+      fontFamily: "Arial", fontSize: "52px", fontStyle: "bold", color: "#ffffff"
+    }).setOrigin(0.5).setDepth(21);
+
+    this.add.text(WIDTH / 2, 270, `TIME: ${score}s`, {
+      fontFamily: "Arial", fontSize: "28px", color: "#d1d5db"
+    }).setOrigin(0.5).setDepth(21);
+
+    this.add.text(WIDTH / 2, 315, `BEST: ${newBest}s`, {
+      fontFamily: "Arial", fontSize: "24px", color: "#60a5fa"
+    }).setOrigin(0.5).setDepth(21);
+
+    const again = this.add.text(WIDTH / 2, 405, "TRY AGAIN", {
+      fontFamily: "Arial", fontSize: "30px", fontStyle: "bold",
+      color: "#ffffff", backgroundColor: "#2563eb",
+      padding: { left: 28, right: 28, top: 14, bottom: 14 }
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(21);
+
+    again.on("pointerover", () => again.setScale(1.05));
+    again.on("pointerout", () => again.setScale(1));
+    again.on("pointerdown", () => this.scene.restart());
+
+    const menu = this.add.text(WIDTH / 2, 495, "MENU", {
+      fontFamily: "Arial", fontSize: "20px", color: "#9ca3af"
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(21);
+
+    menu.on("pointerdown", () => this.scene.start("MenuScene"));
+  }
+
+  private createTouchControls() {
+    const isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    if (!isTouchDevice) return;
+
+    const style = {
+      fontFamily: "Arial", fontSize: "22px", color: "#ffffff",
+      backgroundColor: "#374151",
+      padding: { left: 16, right: 16, top: 12, bottom: 12 }
+    };
+
+    const buttons = [
+      { label: "▲", x: 70, y: HEIGHT - 105, dx: 0, dy: -1 },
+      { label: "◀", x: 25, y: HEIGHT - 55, dx: -1, dy: 0 },
+      { label: "▼", x: 70, y: HEIGHT - 5, dx: 0, dy: 1 },
+      { label: "▶", x: 115, y: HEIGHT - 55, dx: 1, dy: 0 }
+    ];
+
+    for (const button of buttons) {
+      const control = this.add.text(button.x, button.y, button.label, style)
+        .setOrigin(0.5).setAlpha(0.75).setInteractive();
+
+      control.on("pointerdown", () => {
+        this.touchDirection.x = button.dx;
+        this.touchDirection.y = button.dy;
+      });
+      control.on("pointerup", () => {
+        this.touchDirection.x = 0; this.touchDirection.y = 0;
+      });
+      control.on("pointerout", () => {
+        this.touchDirection.x = 0; this.touchDirection.y = 0;
+      });
     }
   }
 }
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
-  width: 800,
-  height: 600,
+  width: WIDTH,
+  height: HEIGHT,
   backgroundColor: "#111827",
-  scene: GameScene,
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+  scene: [MenuScene, GameScene]
 };
 
 new Phaser.Game(config);
