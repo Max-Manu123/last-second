@@ -361,6 +361,9 @@ class GameScene extends Phaser.Scene {
     const oldBest = this.getBestScore();
     const newBest = Math.max(score, oldBest);
 
+    sound.playCollision();
+    if (score > oldBest) sound.playNewRecord();
+
     if (newBest !== oldBest) localStorage.setItem(BEST_KEY, String(newBest));
     this.bestText.setText(`BEST: ${newBest}s`);
 
