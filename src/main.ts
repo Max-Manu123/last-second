@@ -20,87 +20,106 @@ class SoundManager {
     return this.context;
   }
 
-  private resume() {
+  private runWhenReady(callback: (context: AudioContext) => void) {
     const context = this.getContext();
-    if (context?.state === "suspended") void context.resume();
-    return context;
+    if (!context) return;
+
+    if (context.state === "suspended") {
+      void context.resume().then(() => callback(context));
+      return;
+    }
+
+    callback(context);
+  }
+
+  unlock() {
+    const context = this.getContext();
+    if (!context || context.state !== "suspended") return;
+    void context.resume();
   }
 
   playClick() {
-    const context = this.resume();
-    if (!context) return;
-
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(520, context.currentTime);
-    oscillator.frequency.exponentialRampToValueAtTime(760, context.currentTime + 0.08);
-    gain.gain.setValueAtTime(0.0001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.07, context.currentTime + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.1);
-
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    oscillator.start();
-    oscillator.stop(context.currentTime + 0.11);
-  }
-
-  playCollision() {
-    const context = this.resume();
-    if (!context) return;
-
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-
-    oscillator.type = "sawtooth";
-    oscillator.frequency.setValueAtTime(180, context.currentTime);
-    oscillator.frequency.exponentialRampToValueAtTime(55, context.currentTime + 0.28);
-    gain.gain.setValueAtTime(0.0001, context.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.3);
-
-    oscillator.connect(gain);
-    gain.connect(context.destination);
-    oscillator.start();
-    oscillator.stop(context.currentTime + 0.31);
-
-    const noise = context.createBufferSource();
-    const buffer = context.createBuffer(1, context.sampleRate * 0.16, context.sampleRate);
-    const data = buffer.getChannelData(0);
-
-    for (let i = 0; i < data.length; i++) {
-      data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
-    }
-
-    noise.buffer = buffer;
-    const noiseGain = context.createGain();
-    noiseGain.gain.setValueAtTime(0.12, context.currentTime);
-    noiseGain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.16);
-    noise.connect(noiseGain);
-    noiseGain.connect(context.destination);
-    noise.start();
-  }
-
-  playNewRecord() {
-    const context = this.resume();
-    if (!context) return;
-
-    [660, 880, 1047].forEach((frequency, index) => {
-      const start = context.currentTime + index * 0.1;
+    this.runWhenReady((context) => {
+      const now = context.currentTime;
       const oscillator = context.createOscillator();
       const gain = context.createGain();
 
       oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(frequency, start);
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.1, start + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.16);
+      oscillator.frequency.setValueAtTime(520, now);
+      oscillator.frequency.exponentialRampToValueAtTime(760, now + 0.08);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.14, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
 
       oscillator.connect(gain);
       gain.connect(context.destination);
-      oscillator.start(start);
-      oscillator.stop(start + 0.17);
+      oscillator.start(now);
+      oscillator.stop(now + 0.12);
+    });
+  }
+
+  playCollision() {
+    this.runWhenReady((context) => {
+      const now = context.currentTime;
+
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+
+      oscillator.type = "sawtooth";
+      oscillator.frequency.setValueAtTime(190, now);
+      oscillator.frequency.exponentialRampToValueAtTime(55, now + 0.28);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.24, now + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(now);
+      oscillator.stop(now + 0.31);
+
+      const noise = context.createBufferSource();
+      const buffer = context.createBuffer(1, Math.floor(context.sampleRate * 0.16), context.sampleRate);
+      const data = buffer.getChannelData(0);
+
+      for (let i = 0; i < data.length; i++) {
+        data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+      }
+
+      noise.buffer = buffer;
+
+      const noiseGain = context.createGain();
+      noiseGain.gain.setValueAtTime(0.18, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+
+      noise.connect(noiseGain);
+      noiseGain.connect(context.destination);
+      noise.start(now);
+    });
+  }
+
+  playNewRecord() {
+    this.runWhenReady((context) => {
+      const now = context.currentTime;
+
+      [660, 880, 1047].forEach((frequency, index) => {
+        const start = now + index * 0.11;
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(frequency, start);
+
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.16, start + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
+
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start(start);
+        oscillator.stop(start + 0.19);
+      });
     });
   }
 }
