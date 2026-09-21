@@ -8,14 +8,14 @@ class MenuScene extends Phaser.Scene {
   constructor() { super("MenuScene"); }
 
   create() {
-    this.cameras.main.setBackgroundColor("#111827");
+    this.cameras.main.setBackgroundColor("#090d18");
 
     this.add.text(WIDTH / 2, 150, "LAST SECOND", {
       fontFamily: "Arial", fontSize: "64px", fontStyle: "bold", color: "#ffffff"
     }).setOrigin(0.5);
 
     this.add.text(WIDTH / 2, 225, "How long can you survive?", {
-      fontFamily: "Arial", fontSize: "24px", color: "#9ca3af"
+      fontFamily: "Arial", fontSize: "24px", color: "#94a3b8"
     }).setOrigin(0.5);
 
     const best = Number(localStorage.getItem(BEST_KEY) ?? 0);
@@ -34,14 +34,15 @@ class MenuScene extends Phaser.Scene {
     play.on("pointerdown", () => this.scene.start("GameScene"));
 
     this.add.text(WIDTH / 2, 500, "WASD / Arrow Keys to move", {
-      fontFamily: "Arial", fontSize: "18px", color: "#6b7280"
+      fontFamily: "Arial", fontSize: "18px", color: "#64748b"
     }).setOrigin(0.5);
   }
 }
 
 class GameScene extends Phaser.Scene {
-  private player!: Phaser.GameObjects.Arc;
-  private obstacles: Phaser.GameObjects.Arc[] = [];
+  private player!: Phaser.GameObjects.Container;
+  private playerBody!: Phaser.GameObjects.Arc;
+  private obstacles: Phaser.GameObjects.Container[] = [];
   private scoreText!: Phaser.GameObjects.Text;
   private bestText!: Phaser.GameObjects.Text;
   private survivalTime = 0;
@@ -63,21 +64,42 @@ class GameScene extends Phaser.Scene {
     this.obstacles = [];
     this.touchDirection = { x: 0, y: 0 };
 
-    this.cameras.main.setBackgroundColor("#111827");
+    this.cameras.main.setBackgroundColor("#090d18");
 
     this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH - 8, HEIGHT - 8)
-      .setStrokeStyle(2, 0x374151);
+      .setStrokeStyle(2, 0x253047);
 
-    this.player = this.add.circle(WIDTH / 2, HEIGHT / 2, 18, 0x3b82f6);
+    // Subtle arena grid.
+    const graphics = this.add.graphics().setAlpha(0.16);
+    graphics.lineStyle(1, 0x334155);
+    for (let x = 50; x < WIDTH; x += 50) graphics.lineBetween(x, 0, x, HEIGHT);
+    for (let y = 50; y < HEIGHT; y += 50) graphics.lineBetween(0, y, WIDTH, y);
 
-    // Create fresh keyboard keys every time the scene starts/restarts.
+    // Player: glowing blue energy core with a directional arrow.
+    this.player = this.add.container(WIDTH / 2, HEIGHT / 2).setDepth(5);
+    const glow = this.add.circle(0, 0, 25, 0x2563eb, 0.16);
+    this.playerBody = this.add.circle(0, 0, 15, 0x3b82f6);
+    this.playerBody.setStrokeStyle(2, 0x93c5fd);
+    const core = this.add.circle(0, 0, 6, 0xdbeafe);
+    const arrow = this.add.triangle(0, -25, 0, 10, 6, -2, -6, -2, 0x60a5fa);
+    this.player.add([glow, this.playerBody, core, arrow]);
+
+    this.tweens.add({
+      targets: glow,
+      scale: 1.22,
+      alpha: 0.07,
+      duration: 650,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut"
+    });
+
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.keyW = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W);
     this.keyA = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     this.keyS = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S);
     this.keyD = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
 
-    // Prevent the browser from scrolling when arrow keys are used.
     this.input.keyboard!.addCapture([
       Phaser.Input.Keyboard.KeyCodes.UP,
       Phaser.Input.Keyboard.KeyCodes.DOWN,
@@ -94,7 +116,7 @@ class GameScene extends Phaser.Scene {
     }).setDepth(10);
 
     this.bestText = this.add.text(WIDTH - 20, 18, `BEST: ${this.getBestScore()}s`, {
-      fontFamily: "Arial", fontSize: "20px", color: "#9ca3af"
+      fontFamily: "Arial", fontSize: "20px", color: "#94a3b8"
     }).setOrigin(1, 0).setDepth(10);
 
     this.spawnObstacle();
@@ -124,10 +146,26 @@ class GameScene extends Phaser.Scene {
       const length = Math.sqrt(dx * dx + dy * dy);
       this.player.x += (dx / length) * playerSpeed * dt;
       this.player.y += (dy / length) * playerSpeed * dt;
+
+      // Rotate the arrow toward movement direction.
+      const angle = Math.atan2(dy, dx);
+      this.player.rotation = angle + Math.PI / 2;
+
+      // Small movement trail.
+      if (Math.random() < 0.25) {
+        const trail = this.add.circle(this.player.x, this.player.y, 3, 0x60a5fa, 0.45).setDepth(2);
+        this.tweens.add({
+          targets: trail,
+          alpha: 0,
+          scale: 0.2,
+          duration: 260,
+          onComplete: () => trail.destroy()
+        });
+      }
     }
 
-    this.player.x = Phaser.Math.Clamp(this.player.x, 18, WIDTH - 18);
-    this.player.y = Phaser.Math.Clamp(this.player.y, 18, HEIGHT - 18);
+    this.player.x = Phaser.Math.Clamp(this.player.x, 25, WIDTH - 25);
+    this.player.y = Phaser.Math.Clamp(this.player.y, 25, HEIGHT - 25);
 
     this.spawnTimer += delta;
     const spawnInterval = Math.max(1200, 4200 - this.survivalTime * 90);
@@ -146,12 +184,13 @@ class GameScene extends Phaser.Scene {
 
       obstacle.x += Math.cos(angle) * obstacleSpeed * dt;
       obstacle.y += Math.sin(angle) * obstacleSpeed * dt;
+      obstacle.rotation += dt * 1.8;
 
       const distance = Phaser.Math.Distance.Between(
         this.player.x, this.player.y, obstacle.x, obstacle.y
       );
 
-      if (distance < 34) {
+      if (distance < 35) {
         this.endGame();
         return;
       }
@@ -164,16 +203,43 @@ class GameScene extends Phaser.Scene {
     let y = 0;
 
     if (side === 0) {
-      x = Phaser.Math.Between(20, WIDTH - 20); y = -20;
+      x = Phaser.Math.Between(35, WIDTH - 35); y = -30;
     } else if (side === 1) {
-      x = WIDTH + 20; y = Phaser.Math.Between(20, HEIGHT - 20);
+      x = WIDTH + 30; y = Phaser.Math.Between(35, HEIGHT - 35);
     } else if (side === 2) {
-      x = Phaser.Math.Between(20, WIDTH - 20); y = HEIGHT + 20;
+      x = Phaser.Math.Between(35, WIDTH - 35); y = HEIGHT + 30;
     } else {
-      x = -20; y = Phaser.Math.Between(20, HEIGHT - 20);
+      x = -30; y = Phaser.Math.Between(35, HEIGHT - 35);
     }
 
-    this.obstacles.push(this.add.circle(x, y, 16, 0xef4444));
+    // Enemy: rotating red crystal with a dark core and warning glow.
+    const enemy = this.add.container(x, y).setDepth(4);
+    const glow = this.add.circle(0, 0, 27, 0xef4444, 0.12);
+    const crystal = this.add.polygon(0, 0, [
+      0, -18, 13, -7, 18, 0, 13, 7, 0, 18, -13, 7, -18, 0, -13, -7
+    ], 0xef4444);
+    crystal.setStrokeStyle(2, 0xfca5a5);
+    const core = this.add.circle(0, 0, 6, 0x450a0a);
+    enemy.add([glow, crystal, core]);
+    this.tweens.add({
+      targets: glow,
+      scale: 1.25,
+      alpha: 0.04,
+      duration: 500,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut"
+    });
+
+    // Warning flash when an enemy enters the arena.
+    this.tweens.add({
+      targets: enemy,
+      scale: { from: 0.65, to: 1 },
+      duration: 220,
+      ease: "Back.out"
+    });
+
+    this.obstacles.push(enemy);
   }
 
   private getBestScore() {
@@ -191,7 +257,19 @@ class GameScene extends Phaser.Scene {
     if (newBest !== oldBest) localStorage.setItem(BEST_KEY, String(newBest));
     this.bestText.setText(`BEST: ${newBest}s`);
 
+    // Death feedback.
     this.cameras.main.flash(180, 255, 255, 255);
+    this.cameras.main.shake(180, 0.012);
+
+    const burst = this.add.particles(this.player.x, this.player.y, undefined, {
+      speed: { min: 60, max: 220 },
+      scale: { start: 1, end: 0 },
+      lifespan: 450,
+      quantity: 18,
+      tint: 0x60a5fa,
+      emitting: false
+    }).setDepth(30);
+    burst.explode(18);
 
     this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH, HEIGHT, 0x000000, 0.72).setDepth(20);
 
@@ -216,7 +294,6 @@ class GameScene extends Phaser.Scene {
     again.on("pointerover", () => again.setScale(1.05));
     again.on("pointerout", () => again.setScale(1));
 
-    // Use the scene manager to restart from a clean scene state.
     again.on("pointerdown", (_pointer: Phaser.Input.Pointer, _localX: number, _localY: number, event: Phaser.Types.Input.EventData) => {
       event.stopPropagation();
       this.scene.restart();
@@ -238,7 +315,7 @@ class GameScene extends Phaser.Scene {
 
     const style = {
       fontFamily: "Arial", fontSize: "22px", color: "#ffffff",
-      backgroundColor: "#374151",
+      backgroundColor: "#1e293b",
       padding: { left: 16, right: 16, top: 12, bottom: 12 }
     };
 
@@ -251,7 +328,7 @@ class GameScene extends Phaser.Scene {
 
     for (const button of buttons) {
       const control = this.add.text(button.x, button.y, button.label, style)
-        .setOrigin(0.5).setAlpha(0.75).setInteractive();
+        .setOrigin(0.5).setAlpha(0.78).setInteractive();
 
       control.on("pointerdown", () => {
         this.touchDirection.x = button.dx;
@@ -273,7 +350,7 @@ const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   width: WIDTH,
   height: HEIGHT,
-  backgroundColor: "#111827",
+  backgroundColor: "#090d18",
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   scene: [MenuScene, GameScene]
 };
