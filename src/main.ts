@@ -471,22 +471,6 @@ class GameScene extends Phaser.Scene {
       fontFamily: "Arial", fontSize: "24px", color: "#60a5fa"
     }).setOrigin(0.5).setDepth(21);
 
-    const again = this.add.text(WIDTH / 2, 405, "TRY AGAIN", {
-      fontFamily: "Arial", fontSize: "30px", fontStyle: "bold",
-      color: "#ffffff", backgroundColor: "#2563eb",
-      padding: { left: 28, right: 28, top: 14, bottom: 14 }
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(21);
-
-    again.on("pointerover", () => again.setScale(1.05));
-    again.on("pointerout", () => again.setScale(1));
-
-    again.on("pointerdown", (_pointer: Phaser.Input.Pointer, _localX: number, _localY: number, event: Phaser.Types.Input.EventData) => {
-      event.stopPropagation();
-      sound.playClick();
-      trackEvent({ name: "game_replay" });
-      this.scene.restart();
-    });
-
     const feedbackTitle = this.add.text(WIDTH / 2, 350, "Did you enjoy it?", {
       fontFamily: "Arial", fontSize: "18px", color: "#cbd5e1"
     }).setOrigin(0.5).setDepth(21);
@@ -521,6 +505,22 @@ class GameScene extends Phaser.Scene {
       event.stopPropagation();
       sound.playClick();
       sendFeedback("disliked", dislike);
+    });
+
+    const again = this.add.text(WIDTH / 2, 425, "TRY AGAIN", {
+      fontFamily: "Arial", fontSize: "30px", fontStyle: "bold",
+      color: "#ffffff", backgroundColor: "#2563eb",
+      padding: { left: 28, right: 28, top: 14, bottom: 14 }
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(21);
+
+    again.on("pointerover", () => again.setScale(1.05));
+    again.on("pointerout", () => again.setScale(1));
+
+    again.on("pointerdown", (_pointer: Phaser.Input.Pointer, _localX: number, _localY: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      sound.playClick();
+      trackEvent({ name: "game_replay" });
+      this.scene.restart();
     });
 
     const menu = this.add.text(WIDTH / 2, 495, "MENU", {
