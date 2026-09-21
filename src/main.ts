@@ -126,6 +126,22 @@ class SoundManager {
 
 const sound = new SoundManager();
 
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
+let deferredInstallPrompt: InstallPromptEvent | null = null;
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event as InstallPromptEvent;
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+});
+
 
 class MenuScene extends Phaser.Scene {
   constructor() { super("MenuScene"); }
@@ -160,7 +176,34 @@ class MenuScene extends Phaser.Scene {
       this.scene.start("GameScene");
     });
 
-    this.add.text(WIDTH / 2, 500, "WASD / Arrow Keys to move", {
+    const install = this.add.text(WIDTH / 2, 455, "INSTALL GAME", {
+      fontFamily: "Arial", fontSize: "20px", fontStyle: "bold",
+      color: "#93c5fd", backgroundColor: "#172554",
+      padding: { left: 24, right: 24, top: 10, bottom: 10 }
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+
+    install.on("pointerover", () => install.setScale(1.05));
+    install.on("pointerout", () => install.setScale(1));
+    install.on("pointerdown", async () => {
+      sound.playClick();
+
+      if (!deferredInstallPrompt) {
+        install.setText("USE BROWSER INSTALL");
+        return;
+      }
+
+      await deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+
+      if (choice.outcome === "accepted") {
+        install.setText("INSTALLED ✓");
+        install.disableInteractive();
+      }
+
+      deferredInstallPrompt = null;
+    });
+
+    this.add.text(WIDTH / 2, 510, "WASD / Arrow Keys to move", {
       fontFamily: "Arial", fontSize: "18px", color: "#64748b"
     }).setOrigin(0.5);
   }
