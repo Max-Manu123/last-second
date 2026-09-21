@@ -431,6 +431,15 @@ class GameScene extends Phaser.Scene {
     sound.playCollision();
     if (score > oldBest) sound.playNewRecord();
 
+    trackEvent({
+      name: "game_over",
+      params: {
+        score,
+        survival_seconds: score,
+        is_new_record: score > oldBest
+      }
+    });
+
     if (newBest !== oldBest) localStorage.setItem(BEST_KEY, String(newBest));
     this.bestText.setText(`BEST: ${newBest}s`);
 
