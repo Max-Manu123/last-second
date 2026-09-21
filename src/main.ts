@@ -4,6 +4,110 @@ const WIDTH = 800;
 const HEIGHT = 600;
 const BEST_KEY = "last-second-best";
 
+class SoundManager {
+  private context: AudioContext | null = null;
+
+  private getContext() {
+    if (this.context) return this.context;
+
+    const AudioContextClass =
+      window.AudioContext ??
+      (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+    if (!AudioContextClass) return null;
+
+    this.context = new AudioContextClass();
+    return this.context;
+  }
+
+  private resume() {
+    const context = this.getContext();
+    if (context?.state === "suspended") void context.resume();
+    return context;
+  }
+
+  playClick() {
+    const context = this.resume();
+    if (!context) return;
+
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(520, context.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(760, context.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.07, context.currentTime + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.1);
+
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.11);
+  }
+
+  playCollision() {
+    const context = this.resume();
+    if (!context) return;
+
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+
+    oscillator.type = "sawtooth";
+    oscillator.frequency.setValueAtTime(180, context.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(55, context.currentTime + 0.28);
+    gain.gain.setValueAtTime(0.0001, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.3);
+
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.31);
+
+    const noise = context.createBufferSource();
+    const buffer = context.createBuffer(1, context.sampleRate * 0.16, context.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+    }
+
+    noise.buffer = buffer;
+    const noiseGain = context.createGain();
+    noiseGain.gain.setValueAtTime(0.12, context.currentTime);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.16);
+    noise.connect(noiseGain);
+    noiseGain.connect(context.destination);
+    noise.start();
+  }
+
+  playNewRecord() {
+    const context = this.resume();
+    if (!context) return;
+
+    [660, 880, 1047].forEach((frequency, index) => {
+      const start = context.currentTime + index * 0.1;
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.1, start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.16);
+
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(start);
+      oscillator.stop(start + 0.17);
+    });
+  }
+}
+
+const sound = new SoundManager();
+
+
 class MenuScene extends Phaser.Scene {
   constructor() { super("MenuScene"); }
 
@@ -31,7 +135,7 @@ class MenuScene extends Phaser.Scene {
 
     play.on("pointerover", () => play.setScale(1.05));
     play.on("pointerout", () => play.setScale(1));
-    play.on("pointerdown", () => this.scene.start("GameScene"));
+    play.on("pointerdown", () => {\n      sound.playClick();\n      this.scene.start("GameScene");\n    });
 
     this.add.text(WIDTH / 2, 500, "WASD / Arrow Keys to move", {
       fontFamily: "Arial", fontSize: "18px", color: "#64748b"
