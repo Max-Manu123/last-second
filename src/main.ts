@@ -475,13 +475,13 @@ class GameScene extends Phaser.Scene {
       fontFamily: "Arial", fontSize: "18px", color: "#cbd5e1"
     }).setOrigin(0.5).setDepth(21);
 
-    const like = this.add.text(WIDTH / 2 - 70, 375, "👍 YES", {
+    const like = this.add.text(WIDTH / 2 - 78, 390, "👍 YES", {
       fontFamily: "Arial", fontSize: "18px", color: "#86efac",
       backgroundColor: "#14532d",
       padding: { left: 14, right: 14, top: 8, bottom: 8 }
     }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(21);
 
-    const dislike = this.add.text(WIDTH / 2 + 70, 375, "👎 NO", {
+    const dislike = this.add.text(WIDTH / 2 + 78, 390, "👎 NO", {
       fontFamily: "Arial", fontSize: "18px", color: "#fca5a5",
       backgroundColor: "#450a0a",
       padding: { left: 14, right: 14, top: 8, bottom: 8 }
@@ -507,7 +507,7 @@ class GameScene extends Phaser.Scene {
       sendFeedback("disliked", dislike);
     });
 
-    const again = this.add.text(WIDTH / 2, 425, "TRY AGAIN", {
+    const again = this.add.text(WIDTH / 2, 465, "TRY AGAIN", {
       fontFamily: "Arial", fontSize: "30px", fontStyle: "bold",
       color: "#ffffff", backgroundColor: "#2563eb",
       padding: { left: 28, right: 28, top: 14, bottom: 14 }
