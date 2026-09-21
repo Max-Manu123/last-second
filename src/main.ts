@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { trackEvent } from "./analytics";
 
 const WIDTH = 800;
 const HEIGHT = 600;
@@ -147,6 +148,7 @@ class MenuScene extends Phaser.Scene {
   constructor() { super("MenuScene"); }
 
   create() {
+    trackEvent({ name: "player_opened" });
     this.input.on("pointerdown", () => sound.unlock());
     this.cameras.main.setBackgroundColor("#090d18");
 
@@ -173,6 +175,7 @@ class MenuScene extends Phaser.Scene {
     play.on("pointerout", () => play.setScale(1));
     play.on("pointerdown", () => {
       sound.playClick();
+      trackEvent({ name: "game_started" });
       this.scene.start("GameScene");
     });
 
@@ -471,7 +474,44 @@ class GameScene extends Phaser.Scene {
     again.on("pointerdown", (_pointer: Phaser.Input.Pointer, _localX: number, _localY: number, event: Phaser.Types.Input.EventData) => {
       event.stopPropagation();
       sound.playClick();
+      trackEvent({ name: "game_replay" });
       this.scene.restart();
+    });
+
+    const feedbackTitle = this.add.text(WIDTH / 2, 350, "Did you enjoy it?", {
+      fontFamily: "Arial", fontSize: "18px", color: "#cbd5e1"
+    }).setOrigin(0.5).setDepth(21);
+
+    const like = this.add.text(WIDTH / 2 - 70, 375, "👍 YES", {
+      fontFamily: "Arial", fontSize: "18px", color: "#86efac",
+      backgroundColor: "#14532d",
+      padding: { left: 14, right: 14, top: 8, bottom: 8 }
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(21);
+
+    const dislike = this.add.text(WIDTH / 2 + 70, 375, "👎 NO", {
+      fontFamily: "Arial", fontSize: "18px", color: "#fca5a5",
+      backgroundColor: "#450a0a",
+      padding: { left: 14, right: 14, top: 8, bottom: 8 }
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(21);
+
+    const sendFeedback = (value: "liked" | "disliked", button: Phaser.GameObjects.Text) => {
+      trackEvent({ name: "game_feedback", params: { value } });
+      button.setText(value === "liked" ? "THANKS! ✓" : "THANKS ✓");
+      like.disableInteractive();
+      dislike.disableInteractive();
+      feedbackTitle.setText("Thanks for the feedback!");
+    };
+
+    like.on("pointerdown", (_pointer: Phaser.Input.Pointer, _localX: number, _localY: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      sound.playClick();
+      sendFeedback("liked", like);
+    });
+
+    dislike.on("pointerdown", (_pointer: Phaser.Input.Pointer, _localX: number, _localY: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      sound.playClick();
+      sendFeedback("disliked", dislike);
     });
 
     const menu = this.add.text(WIDTH / 2, 495, "MENU", {
