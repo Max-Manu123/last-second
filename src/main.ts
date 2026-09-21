@@ -427,6 +427,7 @@ class GameScene extends Phaser.Scene {
 
     again.on("pointerdown", (_pointer: Phaser.Input.Pointer, _localX: number, _localY: number, event: Phaser.Types.Input.EventData) => {
       event.stopPropagation();
+      sound.playClick();
       this.scene.restart();
     });
 
