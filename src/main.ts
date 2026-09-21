@@ -9,6 +9,7 @@ class MenuScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor("#111827");
+
     this.add.text(WIDTH / 2, 150, "LAST SECOND", {
       fontFamily: "Arial", fontSize: "64px", fontStyle: "bold", color: "#ffffff"
     }).setOrigin(0.5);
@@ -42,35 +43,57 @@ class GameScene extends Phaser.Scene {
   private player!: Phaser.GameObjects.Arc;
   private obstacles: Phaser.GameObjects.Arc[] = [];
   private scoreText!: Phaser.GameObjects.Text;
+  private bestText!: Phaser.GameObjects.Text;
   private survivalTime = 0;
   private gameOver = false;
   private spawnTimer = 0;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private keys!: {
-    W: Phaser.Input.Keyboard.Key;
-    A: Phaser.Input.Keyboard.Key;
-    S: Phaser.Input.Keyboard.Key;
-    D: Phaser.Input.Keyboard.Key;
-  };
+  private keyW!: Phaser.Input.Keyboard.Key;
+  private keyA!: Phaser.Input.Keyboard.Key;
+  private keyS!: Phaser.Input.Keyboard.Key;
+  private keyD!: Phaser.Input.Keyboard.Key;
   private touchDirection = { x: 0, y: 0 };
 
   constructor() { super("GameScene"); }
 
   create() {
+    this.gameOver = false;
+    this.survivalTime = 0;
+    this.spawnTimer = 0;
+    this.obstacles = [];
+    this.touchDirection = { x: 0, y: 0 };
+
     this.cameras.main.setBackgroundColor("#111827");
 
     this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH - 8, HEIGHT - 8)
       .setStrokeStyle(2, 0x374151);
 
     this.player = this.add.circle(WIDTH / 2, HEIGHT / 2, 18, 0x3b82f6);
+
+    // Create fresh keyboard keys every time the scene starts/restarts.
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.keys = this.input.keyboard!.addKeys("W,A,S,D") as typeof this.keys;
+    this.keyW = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+    this.keyA = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+    this.keyS = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+    this.keyD = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+
+    // Prevent the browser from scrolling when arrow keys are used.
+    this.input.keyboard!.addCapture([
+      Phaser.Input.Keyboard.KeyCodes.UP,
+      Phaser.Input.Keyboard.KeyCodes.DOWN,
+      Phaser.Input.Keyboard.KeyCodes.LEFT,
+      Phaser.Input.Keyboard.KeyCodes.RIGHT,
+      Phaser.Input.Keyboard.KeyCodes.W,
+      Phaser.Input.Keyboard.KeyCodes.A,
+      Phaser.Input.Keyboard.KeyCodes.S,
+      Phaser.Input.Keyboard.KeyCodes.D
+    ]);
 
     this.scoreText = this.add.text(20, 18, "TIME: 0", {
       fontFamily: "Arial", fontSize: "24px", fontStyle: "bold", color: "#ffffff"
     }).setDepth(10);
 
-    this.add.text(WIDTH - 20, 18, `BEST: ${this.getBestScore()}s`, {
+    this.bestText = this.add.text(WIDTH - 20, 18, `BEST: ${this.getBestScore()}s`, {
       fontFamily: "Arial", fontSize: "20px", color: "#9ca3af"
     }).setOrigin(1, 0).setDepth(10);
 
@@ -81,7 +104,7 @@ class GameScene extends Phaser.Scene {
   update(_time: number, delta: number) {
     if (this.gameOver) return;
 
-    const dt = delta / 1000;
+    const dt = Math.min(delta / 1000, 0.05);
     this.survivalTime += dt;
     this.scoreText.setText(`TIME: ${Math.floor(this.survivalTime)}`);
 
@@ -89,10 +112,10 @@ class GameScene extends Phaser.Scene {
     let dx = 0;
     let dy = 0;
 
-    if (this.cursors.left.isDown || this.keys.A.isDown) dx -= 1;
-    if (this.cursors.right.isDown || this.keys.D.isDown) dx += 1;
-    if (this.cursors.up.isDown || this.keys.W.isDown) dy -= 1;
-    if (this.cursors.down.isDown || this.keys.S.isDown) dy += 1;
+    if (this.cursors.left.isDown || this.keyA.isDown) dx -= 1;
+    if (this.cursors.right.isDown || this.keyD.isDown) dx += 1;
+    if (this.cursors.up.isDown || this.keyW.isDown) dy -= 1;
+    if (this.cursors.down.isDown || this.keyS.isDown) dy += 1;
 
     dx += this.touchDirection.x;
     dy += this.touchDirection.y;
@@ -158,6 +181,7 @@ class GameScene extends Phaser.Scene {
   }
 
   private endGame() {
+    if (this.gameOver) return;
     this.gameOver = true;
 
     const score = Math.floor(this.survivalTime);
@@ -165,6 +189,7 @@ class GameScene extends Phaser.Scene {
     const newBest = Math.max(score, oldBest);
 
     if (newBest !== oldBest) localStorage.setItem(BEST_KEY, String(newBest));
+    this.bestText.setText(`BEST: ${newBest}s`);
 
     this.cameras.main.flash(180, 255, 255, 255);
 
@@ -190,13 +215,21 @@ class GameScene extends Phaser.Scene {
 
     again.on("pointerover", () => again.setScale(1.05));
     again.on("pointerout", () => again.setScale(1));
-    again.on("pointerdown", () => this.scene.restart());
+
+    // Use the scene manager to restart from a clean scene state.
+    again.on("pointerdown", (_pointer: Phaser.Input.Pointer, _localX: number, _localY: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      this.scene.restart();
+    });
 
     const menu = this.add.text(WIDTH / 2, 495, "MENU", {
       fontFamily: "Arial", fontSize: "20px", color: "#9ca3af"
     }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(21);
 
-    menu.on("pointerdown", () => this.scene.start("MenuScene"));
+    menu.on("pointerdown", (_pointer: Phaser.Input.Pointer, _localX: number, _localY: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      this.scene.start("MenuScene");
+    });
   }
 
   private createTouchControls() {
@@ -225,10 +258,12 @@ class GameScene extends Phaser.Scene {
         this.touchDirection.y = button.dy;
       });
       control.on("pointerup", () => {
-        this.touchDirection.x = 0; this.touchDirection.y = 0;
+        this.touchDirection.x = 0;
+        this.touchDirection.y = 0;
       });
       control.on("pointerout", () => {
-        this.touchDirection.x = 0; this.touchDirection.y = 0;
+        this.touchDirection.x = 0;
+        this.touchDirection.y = 0;
       });
     }
   }
