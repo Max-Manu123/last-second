@@ -135,7 +135,10 @@ class MenuScene extends Phaser.Scene {
 
     play.on("pointerover", () => play.setScale(1.05));
     play.on("pointerout", () => play.setScale(1));
-    play.on("pointerdown", () => {\n      sound.playClick();\n      this.scene.start("GameScene");\n    });
+    play.on("pointerdown", () => {
+      sound.playClick();
+      this.scene.start("GameScene");
+    });
 
     this.add.text(WIDTH / 2, 500, "WASD / Arrow Keys to move", {
       fontFamily: "Arial", fontSize: "18px", color: "#64748b"
