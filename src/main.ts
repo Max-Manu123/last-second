@@ -131,6 +131,7 @@ class MenuScene extends Phaser.Scene {
   constructor() { super("MenuScene"); }
 
   create() {
+    this.input.on("pointerdown", () => sound.unlock());
     this.cameras.main.setBackgroundColor("#090d18");
 
     this.add.text(WIDTH / 2, 150, "LAST SECOND", {
@@ -184,6 +185,7 @@ class GameScene extends Phaser.Scene {
   constructor() { super("GameScene"); }
 
   create() {
+    this.input.on("pointerdown", () => sound.unlock());
     this.gameOver = false;
     this.survivalTime = 0;
     this.spawnTimer = 0;
